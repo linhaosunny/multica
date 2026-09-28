@@ -57,9 +57,13 @@ if [ "${1:-}" = "--embed" ] || [ "${HARMONY_BUILD_MODE:-}" = "release" ]; then
   # minified bundles both fail to register in the RNOH 0.77 runtime; the dev
   # plain bundle with inlineRequires:true is the one verified combination.
   # inlineRequires is pinned in metro.config.js — keep them in sync.
+  # --reset-cache: metro's transform cache does not key on env vars, so
+  # switching variants (staging <-> production) without it bakes the PREVIOUS
+  # variant's MULTICA_API_URL into the embedded bundle.
   (cd "$PROJECT_ROOT" && "$PROJECT_ROOT/node_modules/.bin/react-native" \
     bundle-harmony \
     --dev true \
+    --reset-cache \
     --bundle-output "$HARMONY_DIR/entry/src/main/resources/rawfile/bundle.harmony.js")
 fi
 

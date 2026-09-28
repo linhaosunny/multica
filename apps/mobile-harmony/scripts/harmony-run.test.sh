@@ -118,6 +118,8 @@ hvigor_line=$(grep -n "^node hvigorw.js" "$CALLS_FILE" | cut -d: -f1)
 [ -n "$bundle_line" ] || fail "embedded mode must generate the bundle"
 [ "$bundle_line" -lt "$hvigor_line" ] || fail "bundle generation must precede hvigor"
 grep -q -- "--dev true" "$CALLS_FILE" || fail "embedded bundle must be a dev bundle"
+grep -q -- "--reset-cache" "$CALLS_FILE" ||
+  fail "embedded bundle must reset metro cache (env inlining would go stale)"
 grep -q -- "--js-engine hermes" "$CALLS_FILE" &&
   fail "hermes bytecode must not be requested (fails to register)"
 grep -q -- "buildMode=release" "$CALLS_FILE" &&

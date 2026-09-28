@@ -29,6 +29,11 @@ export class MulticaNetInfoModule extends UITurboModule {
     if (wasZero) {
       this.registerConnection();
     }
+    // Match the upstream module contract: a subscriber immediately receives
+    // the current state, not just future edges.
+    this.readState().then((state) => {
+      this.ctx.rnInstance.emitDeviceEvent('netInfo.networkStatusDidChange', state)
+    })
   }
 
   removeListeners(_count: number): void {

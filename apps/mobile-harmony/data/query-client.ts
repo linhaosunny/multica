@@ -48,7 +48,24 @@ focusManager.setEventListener((handleFocus) => {
 // to NetInfo to force-reconnect the WS — both flows are driven by the
 // same signal so client state and server state catch up together.
 onlineManager.setEventListener((setOnline) => {
-  return NetInfo.addEventListener((state) => {
+  const sub = NetInfo.addEventListener((state) => {
     setOnline(state.isConnected === true);
   });
+  // The harmony netinfo module only emits on connection-edge events; resolve
+  // the initial state explicitly so startup never stays paused with every
+  // query deferred. Optimistic on failure — a paused app is worse than a
+  // failed request's own retry.
+  NetInfo.fetch()
+    .then((state) => {
+      setOnline(state.isConnected === true);
+    })
+    .catch(() => {
+      // Unreachable in practice (fetch resolves even when offline); the
+      // optimistic default keeps the app usable over a dead probe.
+      setOnline(true);
+    });
+  // netinfo v11's subscription is the unsubscribe function itself.
+  return () => {
+    sub();
+  };
 });

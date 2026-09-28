@@ -83,3 +83,6 @@ data/
 __pycache__/
 *.pyc
 perf-report/
+
+# ZCode session artifacts (plans, agent state) — tool-internal, not project source
+.zcode/

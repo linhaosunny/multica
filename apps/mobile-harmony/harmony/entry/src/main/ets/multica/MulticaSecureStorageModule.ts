@@ -34,18 +34,22 @@ export class MulticaSecureStorageModule extends AnyThreadTurboModule {
 
   async set(key: string, value: string): Promise<boolean> {
     const alias = toBytes(KEY_PREFIX + key);
+    const attrs: asset.AssetMap = new Map();
+    attrs.set(asset.Tag.SECRET, toBytes(value));
+    // Update-first: the existence probe (asset.query on a missing alias)
+    // THROWS 24000002 rather than returning empty, which used to abort the
+    // whole set before ever attempting the add — first write never landed.
     try {
-      const existing = await this.readSecret(alias);
-      if (existing !== null) {
-        const attrs: asset.AssetMap = new Map();
-        attrs.set(asset.Tag.SECRET, toBytes(value));
-        await asset.update(aliasQuery(alias), attrs);
-      } else {
-        const attrs: asset.AssetMap = new Map();
-        attrs.set(asset.Tag.ALIAS, alias);
-        attrs.set(asset.Tag.SECRET, toBytes(value));
-        await asset.add(attrs);
-      }
+      await asset.update(aliasQuery(alias), attrs);
+      return true;
+    } catch (e) {
+      // Alias missing — fall through to add.
+    }
+    try {
+      const add: asset.AssetMap = new Map();
+      add.set(asset.Tag.ALIAS, alias);
+      add.set(asset.Tag.SECRET, toBytes(value));
+      await asset.add(add);
       return true;
     } catch (e) {
       console.error(`[MulticaSecureStorage] set failed: ${JSON.stringify(e)}`);
@@ -57,7 +61,7 @@ export class MulticaSecureStorageModule extends AnyThreadTurboModule {
     try {
       return await this.readSecret(toBytes(KEY_PREFIX + key));
     } catch (e) {
-      console.error(`[MulticaSecureStorage] get failed: ${JSON.stringify(e)}`);
+      // Missing alias (24000002) is the normal no-token-yet path — silent.
       return null;
     }
   }

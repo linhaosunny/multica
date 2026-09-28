@@ -23,6 +23,12 @@
       },
       {
         "name": "ohos.permission.VIBRATE"
+      },
+      {
+        // connection.getDefaultNetSync/getNetCapabilities (netinfo) require
+        // this system_grant permission; without it the calls throw and the
+        // app reports offline, pausing every TanStack query.
+        "name": "ohos.permission.GET_NETWORK_INFO"
       }
     ],
     "metadata": [
