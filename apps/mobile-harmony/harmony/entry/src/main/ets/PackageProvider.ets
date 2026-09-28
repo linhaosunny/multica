@@ -15,7 +15,6 @@ import {
   AnyThreadTurboModuleContext,
 } from '@rnoh/react-native-openharmony';
 import { ReanimatedPackage } from '@react-native-oh-tpl/react-native-reanimated/ts'
-import { SafeAreaViewPackage } from '@react-native-oh-tpl/react-native-safe-area-context'
 import { MulticaPackage } from './multica/MulticaPackage'
 
 type UITurboModuleByNameFactory = (ctx: UITurboModuleContext) => UITurboModule | null
@@ -47,21 +46,6 @@ class ReanimatedPackageAdapter extends ReanimatedPackage {
   }
 }
 
-class SafeAreaViewPackageAdapter extends SafeAreaViewPackage {
-  createWrappedCustomRNComponentBuilderByComponentNameMap(): Map<string, WrappedBuilder<[ComponentBuilderContext]>> {
-    return new Map();
-  }
-
-  getUITurboModuleFactoryByNameMap(): Map<string, UITurboModuleByNameFactory> {
-    const map = super.getUITurboModuleFactoryByNameMap()
-    map.set('RNCSafeAreaContext', (ctx: UITurboModuleContext) => {
-      const legacyFactory = this.createTurboModulesFactory(ctx)
-      return legacyFactory?.createTurboModule('RNCSafeAreaContext') ?? null
-    })
-    return map
-  }
-}
-
 // RNCNetInfo is registered in MulticaPackage (the netinfo tpl package's
 // oh-package entry is broken, so its package class cannot be extended —
 // the module class is imported by subpath there). The matching CPP proxy
@@ -71,7 +55,6 @@ export function getRNOHPackages(ctx: RNPackageContext): RNOHPackage[] {
   return [
     ...createRNOHPackagesAutolinking(ctx),
     new ReanimatedPackageAdapter(ctx),
-    new SafeAreaViewPackageAdapter(ctx),
     new MulticaPackage(ctx),
   ]
 }

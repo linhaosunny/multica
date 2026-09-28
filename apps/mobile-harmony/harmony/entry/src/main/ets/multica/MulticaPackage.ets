@@ -18,6 +18,7 @@ import { MulticaSecureStorageModule } from './MulticaSecureStorageModule';
 import { MulticaClipboardModule } from './MulticaClipboardModule';
 import { MulticaHapticsModule } from './MulticaHapticsModule';
 import { MulticaMediaPickerModule } from './MulticaMediaPickerModule';
+import { MulticaSafeAreaModule } from './MulticaSafeAreaModule';
 import { MulticaNetInfoModule } from './MulticaNetInfoModule';
 
 type AnyThreadTurboModuleByNameFactory = (ctx: AnyThreadTurboModuleContext) => AnyThreadTurboModule | null
@@ -30,6 +31,7 @@ export class MulticaPackage extends RNOHPackage {
     map.set('MulticaClipboard', (ctx: AnyThreadTurboModuleContext) => new MulticaClipboardModule(ctx))
     map.set('MulticaHaptics', (ctx: AnyThreadTurboModuleContext) => new MulticaHapticsModule(ctx))
     map.set('MulticaMediaPicker', (ctx: AnyThreadTurboModuleContext) => new MulticaMediaPickerModule(ctx))
+    map.set('MulticaSafeArea', (ctx: AnyThreadTurboModuleContext) => new MulticaSafeAreaModule(ctx))
     return map
   }
 

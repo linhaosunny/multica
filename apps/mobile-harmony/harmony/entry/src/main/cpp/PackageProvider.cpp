@@ -37,6 +37,18 @@ class MulticaClipboardTurboModule : public ArkTSTurboModule {
   }
 };
 
+// Safe-area insets (physical px) for lib/safe-area — the vendored tpl
+// safe-area module resolves zeros in common window states.
+class MulticaSafeAreaTurboModule : public ArkTSTurboModule {
+ public:
+  MulticaSafeAreaTurboModule(const ArkTSTurboModule::Context ctx, const std::string name)
+      : ArkTSTurboModule(ctx, name) {
+    methodMap_ = {
+        ARK_ASYNC_METHOD_METADATA(getInsets, 0),
+    };
+  }
+};
+
 class MulticaHapticsTurboModule : public ArkTSTurboModule {
  public:
   MulticaHapticsTurboModule(const ArkTSTurboModule::Context ctx, const std::string name)
@@ -60,20 +72,6 @@ class MulticaMediaPickerTurboModule : public ArkTSTurboModule {
     methodMap_ = {
         ARK_ASYNC_METHOD_METADATA(pickImage, 0),
         ARK_ASYNC_METHOD_METADATA(pickDocument, 0),
-    };
-  }
-};
-
-// The safe-area tpl package predates codegen (no CPP glue generated), so
-// its turbo module proxy lives here too. JS only consumes getConstants()
-// (initialWindowMetrics) through lib/safe-area.
-class RNCSafeAreaContextTurboModule : public ArkTSTurboModule {
- public:
-  RNCSafeAreaContextTurboModule(const ArkTSTurboModule::Context ctx, const std::string name)
-      : ArkTSTurboModule(ctx, name) {
-    methodMap_ = {
-        ARK_METHOD_METADATA(getConstants, 0),
-        ARK_ASYNC_METHOD_METADATA(getSafeAreaInsets, 0),
     };
   }
 };
@@ -107,8 +105,8 @@ class MulticaTurboModuleFactoryDelegate : public TurboModuleFactoryDelegate {
     if (name == "MulticaMediaPicker") {
       return std::make_shared<MulticaMediaPickerTurboModule>(ctx, name);
     }
-    if (name == "RNCSafeAreaContext") {
-      return std::make_shared<RNCSafeAreaContextTurboModule>(ctx, name);
+    if (name == "MulticaSafeArea") {
+      return std::make_shared<MulticaSafeAreaTurboModule>(ctx, name);
     }
     if (name == "RNCNetInfo") {
       return std::make_shared<RNCNetInfoTurboModule>(ctx, name);

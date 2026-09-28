@@ -49,7 +49,15 @@ export function TabBar({
     <View
       style={[
         styles.bar,
-        { backgroundColor: c.background, borderTopColor: c.border, paddingBottom: insets.bottom },
+        {
+          backgroundColor: c.background,
+          borderTopColor: c.border,
+          // Height must grow with the inset: Yoga heights are border-box, so
+          // a fixed 49 with paddingBottom would squeeze the icon row upward
+          // through the top hairline instead of reserving space below it.
+          height: TAB_BAR_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
         style,
       ]}
     >
@@ -122,7 +130,6 @@ export function TabView({
 const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
-    height: TAB_BAR_HEIGHT,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 },

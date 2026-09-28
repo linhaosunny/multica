@@ -567,16 +567,21 @@ export function ChatScreen({ onOpenAgents, active = true }: Props) {
         ) : currentAgent ? (
           <RuntimeRequiredBanner agentName={currentAgent.name} />
         ) : null}
-        <ChatComposer
-          value={draft}
-          onChangeText={(next) => setDraft(draftKey, next)}
-          onSend={handleSend}
-          onStop={handleStop}
-          sending={sending}
-          allowStop={pendingTask?.status !== "queued"}
-          disabled={disabled}
-          disabledReason={disabledReason}
-        />
+        {/* iOS shows the composer flush above its translucent blurred tab
+            bar; the opaque harmony bar needs explicit breathing room or the
+            pill reads as overlapping the bar's hairline. */}
+        <View style={{ paddingBottom: 8 }}>
+          <ChatComposer
+            value={draft}
+            onChangeText={(next) => setDraft(draftKey, next)}
+            onSend={handleSend}
+            onStop={handleStop}
+            sending={sending}
+            allowStop={pendingTask?.status !== "queued"}
+            disabled={disabled}
+            disabledReason={disabledReason}
+          />
+        </View>
       </View>
 
       <AgentPickerSheet
