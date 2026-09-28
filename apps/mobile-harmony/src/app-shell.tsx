@@ -114,6 +114,22 @@ function TabsRoot({ nav }: { nav: StackNav<AppRoute> }) {
   );
   const canSwitch = (workspaces?.length ?? 0) > 1;
 
+  // Cold start restores the persisted slug but not the in-memory id (see
+  // workspace-store.ts), and every workspace-scoped query is gated on the id.
+  // Resolve it from the list once the query lands — the same write the
+  // workspace picker performs on selection. A slug with no matching workspace
+  // (deleted workspace, removed member) clears the store so the shell's
+  // session effect reroutes to the picker instead of leaving every query
+  // silently disabled behind a dead slug.
+  const setCurrentWorkspace = useWorkspaceStore((s) => s.setCurrentWorkspace);
+  const clearWorkspace = useWorkspaceStore((s) => s.clear);
+  useEffect(() => {
+    if (!slug || wsId || workspaces === undefined) return;
+    const match = workspaces.find((w) => w.slug === slug);
+    if (match) void setCurrentWorkspace(match.id, match.slug);
+    else void clearWorkspace();
+  }, [slug, wsId, workspaces, setCurrentWorkspace, clearWorkspace]);
+
   const renderTab = (key: string) => {
     switch (key) {
       case "inbox":
