@@ -287,8 +287,14 @@ RETURNING *;
 
 -- name: ListAgentTasks :many
 SELECT * FROM agent_task_queue
-WHERE agent_id = $1
-ORDER BY created_at DESC;
+WHERE agent_id = @agent_id
+  -- Apply visibility before LIMIT so hidden fallbacks cannot end a page early.
+  -- Keep this predicate in sync with handler.visibleTaskHistory.
+  AND NOT (escalation_for_task_id IS NOT NULL AND started_at IS NULL
+           AND status IN ('deferred', 'cancelled'))
+  AND (created_at, id) < (@before_created_at::timestamptz, @before_id::uuid)
+ORDER BY created_at DESC, id DESC
+LIMIT @page_limit;
 
 -- name: CreateAgentTask :one
 -- Fenced against workspace teardown: lock_task_owner_rows (migration 284)
@@ -687,28 +693,6 @@ WHERE (trigger_comment_id = $1 OR $1 = ANY(coalesced_comment_ids))
   AND status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
 RETURNING *;
 
--- name: CancelAgentTasksByEditedComment :many
--- Content edits normally invalidate tasks whose prompt may contain the old
--- body. A task with a durable steer receipt is the exception: pending claims
--- read the current body, while claimed/delivered rows must not be retriggered
--- because doing so executes both the old and edited instruction. Deletion keeps
--- using CancelAgentTasksByTriggerComment and cancels every matching task.
-UPDATE agent_task_queue t
-SET status = 'cancelled', completed_at = now(), prepare_lease_expires_at = NULL,
-    cancelled_by_type = 'system', cancelled_by_id = NULL, cancelled_by_name = NULL,
-    context = COALESCE(t.context, '{}'::jsonb) || jsonb_build_object('comment_change_cancelled_task_id', t.id::text)
-WHERE (t.trigger_comment_id = @comment_id OR @comment_id = ANY(t.coalesced_comment_ids))
-  AND t.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
-  AND NOT EXISTS (
-      SELECT 1
-      FROM comment_agent_delivery d
-      WHERE d.comment_id = @comment_id
-        AND d.agent_id = t.agent_id
-        AND d.task_id = t.id
-        AND d.status IN ('pending', 'steering', 'delivered')
-  )
-RETURNING t.*;
-
 -- name: CancelAgentTasksByChatSession :many
 -- Cancels active tasks belonging to a chat session. Called from
 -- DeleteChatSession so the daemon doesn't keep running work whose result
@@ -990,6 +974,7 @@ WHERE id = $1
 RETURNING *;
 
 -- name: StartAgentTask :one
+-- Legacy single-winner transition; generation-aware callers lock the claim first.
 -- Transitions a task to running. Accepts either 'dispatched' (the normal
 -- claim → run flow) or 'waiting_local_directory' (the daemon held the row in
 -- a wait state while another task owned the local_directory path lock; once
@@ -1001,8 +986,16 @@ SET status = 'running',
     started_at = now(),
     wait_reason = NULL,
     prepare_lease_expires_at = NULL
-WHERE id = $1 AND status IN ('dispatched', 'waiting_local_directory')
+WHERE agent_task_queue.id = $1 AND agent_task_queue.status IN ('dispatched', 'waiting_local_directory')
 RETURNING *;
+
+-- name: LockAgentTaskStartClaim :one
+-- Serialize start/replay with reclaim and cancellation. A stale delivery must
+-- never start or acknowledge a newer claim, even on the same runtime.
+SELECT * FROM agent_task_queue
+WHERE id = $1 AND runtime_id = $2 AND dispatched_at = $3
+  AND status IN ('dispatched', 'waiting_local_directory', 'running')
+FOR UPDATE;
 
 -- name: MarkAgentTaskWaitingLocalDirectory :one
 -- Transitions a freshly-dispatched task into 'waiting_local_directory' while
@@ -1796,6 +1789,11 @@ WHERE agent_id = $1 AND status IN ('dispatched', 'running', 'waiting_local_direc
 SELECT * FROM agent
 WHERE id = $1
 FOR UPDATE;
+
+-- name: HasTaskForIssue :one
+-- Returns true if the issue has any task in any status. Webhook recovery
+-- treats even a terminal task as proof that ownership moved downstream.
+SELECT EXISTS (SELECT 1 FROM agent_task_queue WHERE issue_id = $1);
 
 -- name: HasActiveTaskForIssue :one
 -- Returns true if there is any queued, dispatched, waiting_local_directory,
@@ -2611,7 +2609,10 @@ SELECT
     COUNT(*)::int AS task_count,
     COUNT(*) FILTER (WHERE atq.status = 'failed')::int AS failed_count,
     COUNT(*) FILTER (WHERE atq.status = 'completed')::int AS completed_count,
-    COUNT(*) FILTER (WHERE atq.status = 'cancelled')::int AS cancelled_count
+    COUNT(*) FILTER (WHERE atq.status = 'cancelled')::int AS cancelled_count,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (atq.completed_at - atq.started_at)) * 1000)
+        FILTER (WHERE atq.completed_at > atq.started_at), 0)::float8 AS duration_ms,
+    COUNT(*) FILTER (WHERE atq.completed_at > atq.started_at)::int AS duration_count
 FROM agent_task_queue atq
 JOIN agent a ON a.id = atq.agent_id
 WHERE a.workspace_id = $1
